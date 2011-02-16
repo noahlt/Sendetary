@@ -1,0 +1,4 @@
+Because I haven't set up any build tools yet:
+
+scalac -d build -cp lib/smack.jar sendetary.scala
+scala -cp build:lib/smack.jar Sendetary noah tim
