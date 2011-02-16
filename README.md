@@ -8,6 +8,6 @@ Building
 
 Because I haven't set up any build tools yet:
 
-mkdir build
-scalac -d build -cp lib/smack.jar sendetary.scala
-scala -cp build:lib/smack.jar Sendetary noah tim
+    mkdir build
+    scalac -d build -cp lib/smack.jar sendetary.scala
+    scala -cp build:lib/smack.jar Sendetary noah tim
