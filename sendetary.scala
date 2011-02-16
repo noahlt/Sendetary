@@ -7,7 +7,11 @@ import java.awt.datatransfer.DataFlavor
 import java.io.StringReader
 import java.io.ByteArrayOutputStream
 
-/* This code is ridiculously ugly. */
+import org.jivesoftware.smack.{XMPPConnection, SASLAuthentication, PacketListener}
+import org.jivesoftware.smack.packet.{Message, Packet}
+import org.jivesoftware.smack.filter.PacketFilter
+
+/* This code is ridiculously ugly. Don't judge me yet. */
 
 class SendetaryCanvas extends Canvas {
   def SendetaryCanvas() {
@@ -30,7 +34,52 @@ class SendetaryCanvas extends Canvas {
   }
 }
 
+// FIXME change all this to an actor?
+class SendetaryJabber(val user: String, val host: String) {
+  val conn = new XMPPConnection(host)
+  conn.connect()
+  /* Hack: For some reason it tries to use MD5 even when we set PLAIN
+   * to high priority.  So tell it to not try MD5 at all: */
+  SASLAuthentication.unsupportSASLMechanism("DIGEST-MD5")
+  SASLAuthentication.supportSASLMechanism("PLAIN", 0)
+  conn.login(user, "anagram")
+  println("authenticated!")
+
+  conn.addPacketListener(
+    new PacketListener() {
+      override def processPacket(packet: Packet) {
+	packet match {
+	  case m: Message => {
+	    // FIXME I'm sure there's a Scala-tastic way to do this
+	    // with real pattern matching instead of lame if-elses...
+	    val s = m.getBody()
+	    if (s.substring(0,7) == "http://") {
+	      Runtime.getRuntime().exec("chrome --new-window " + s)
+	      println("Received URL: " + s)
+	    } else {
+	      println(s)
+	    }
+	  }
+	  case other => println("just another packet...")
+	}
+      }
+    },
+    new PacketFilter() {
+      override def accept(packet: Packet) = true
+    }
+  )
+  
+  // This is temporary.
+  def send(to: String, s: String) {
+    val mesg = new Message(to + "@" + host)
+    mesg.setBody(s)
+    conn.sendPacket(mesg)
+    println("[ sent IM to " + to + " ]")
+  }
+}
+
 object Sendetary {
+
   // Gross.
   def stringFromReader(sr: StringReader): String =  {
     val buf = new ByteArrayOutputStream()
@@ -52,15 +101,18 @@ object Sendetary {
   }
 
   def main(args: Array[String]) {
-    println("Hi there.");
+    val us = args(0)
+    val them = args(1)
+    println(us)
+    println(them)
+    val jabber = new SendetaryJabber(us, "scorpio")
 
     val wl:WindowListener = new WindowAdapter() {
       override def windowClosing(e: WindowEvent) { System.exit(0) }
       override def windowClosed(e: WindowEvent) { System.exit(0) }
     }
 
-    val font = new Font("Vera Sans", Font.BOLD, 18)
-    val f = new Frame("2D Text")
+    val f = new Frame("drag into this window to send to " + them)
     val canvas = new SendetaryCanvas()
 
     f.addWindowListener(wl)
@@ -68,7 +120,7 @@ object Sendetary {
     f.pack()
     f.setSize(new Dimension(400, 300))
     f.show()
-    
+
     val dt = new DropTarget(canvas, new DropTargetListener() {
       def drop(e: DropTargetDropEvent) {
 	println("drop event!!!")
@@ -78,10 +130,10 @@ object Sendetary {
 	 * (which allows for Unicode etc) is complicated, so for
 	 * version 1 we're using the deprecated version */
 	if (t.isDataFlavorSupported(DataFlavor.plainTextFlavor)) {
-	  println("yes plain text is supported!")
 	  val sr: StringReader = t.getTransferData(DataFlavor.plainTextFlavor)
 				  .asInstanceOf[StringReader]
-	  processString(stringFromReader(sr))
+	  val s = stringFromReader(sr)
+	  jabber.send(them, s)
 	}
       }
 
